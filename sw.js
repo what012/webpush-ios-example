@@ -18,6 +18,19 @@ self.addEventListener('message', (e) => {
       })
     );
   }
+
+  // support receiving a batch of notifications in one message
+  if (e.data && e.data.type === 'SHOW_NOTIFICATION_BATCH' && Array.isArray(e.data.notifications)) {
+    const notifs = e.data.notifications;
+    e.waitUntil(
+      Promise.all(notifs.map(n => {
+        const t = n.title || 'Notification';
+        const b = n.body || '';
+        const tg = n.tag || undefined;
+        return self.registration.showNotification(t, { body: b, tag: tg, silent: true, renotify: !!tg });
+      }))
+    );
+  }
 });
 
 self.addEventListener('notificationclick', (e) => {
