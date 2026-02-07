@@ -137,6 +137,27 @@ textarea{min-height:72px}
     </div>
   </div>
 
+  <div class="section">
+    <div class="label">Chunk Size</div>
+    <input type="number" id="chunkSize" value="2" min="1" max="200" placeholder="2">
+    <div style="margin-top:8px;font-size:13px;color:var(--txt2)">
+      <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="chunkMode" checked>
+        <span>Enable chunked mode (multiple notifications per trigger)</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="label">Sub-batch Size</div>
+    <input type="number" id="subBatchSize" value="2" min="1" max="200" placeholder="2">
+  </div>
+
+  <div class="section">
+    <div class="label">Delay between sub-batches (ms)</div>
+    <input type="number" id="subBatchDelayMs" value="0" min="0" placeholder="0">
+  </div>
+
   <div class="stats">
     <div class="stat">
       <div class="stat-val" id="countVal">0</div>
@@ -182,6 +203,9 @@ textarea{min-height:72px}
   const titleEl = $('#notifTitle');
   const bodyEl = $('#notifBody');
   const msEl = $('#intervalMs');
+  const chunkEl = $('#chunkSize');
+  const subBatchEl = $('#subBatchSize');
+  const subDelayEl = $('#subBatchDelayMs');
   const rateEl = $('#rateVal');
   const countEl = $('#countVal');
   const elapsedEl = $('#elapsedVal');
@@ -196,6 +220,7 @@ textarea{min-height:72px}
   const installBanner = $('#installBanner');
   const installClose = $('#installClose');
   const presetsEl = $('#presets');
+  const chunkModeEl = $('#chunkMode');
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -229,7 +254,13 @@ textarea{min-height:72px}
     bodyEl.disabled = d;
     msEl.disabled = d;
     presetsEl.querySelectorAll('.preset').forEach(b => b.disabled = d);
+    if (chunkEl) chunkEl.disabled = d;
+    if (subBatchEl) subBatchEl.disabled = d;
+    if (subDelayEl) subDelayEl.disabled = d;
+    if (chunkModeEl) chunkModeEl.disabled = d;
   }
+
+  function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
   function formatElapsed(ms) {
     const s = Math.floor(ms / 1000);
@@ -240,15 +271,58 @@ textarea{min-height:72px}
   }
 
   async function sendNotif() {
-    count++;
-    countEl.textContent = count.toLocaleString();
     const title = titleEl.value || 'Notification';
     const body = bodyEl.value || '';
+    const useChunk = chunkModeEl ? chunkModeEl.checked : true;
+    const chunk = useChunk ? Math.max(1, Math.min(200, parseInt((chunkEl && chunkEl.value) || 1))) : 1;
+    const subBatch = useChunk ? Math.max(1, Math.min(chunk, parseInt((subBatchEl && subBatchEl.value) || chunk))) : 1;
+    const subDelay = Math.max(0, parseInt((subDelayEl && subDelayEl.value) || 0));
 
-    if (swReg && swReg.active) {
-      swReg.active.postMessage({ type: 'SHOW_NOTIFICATION', title, body, tag: 'blast-' + (count % 3) });
-    } else if (notifSupported && Notification.permission === 'granted') {
-      try { new Notification(title, { body, silent: true, tag: 'blast-' + (count % 3), renotify: true }); } catch(e) {}
+    for (let offset = 0; offset < chunk; offset += subBatch) {
+      const promises = [];
+      const take = Math.min(subBatch, chunk - offset);
+      for (let i = 0; i < take; i++) {
+        const idx = offset + i;
+        count++;
+        countEl.textContent = count.toLocaleString();
+        const uniqueTag = 'blast-' + Date.now() + '-' + count + '-' + idx;
+
+        if (swReg && swReg.active) {
+          // collect into batch for this sub-batch
+          if (!swReg._batch) swReg._batch = [];
+          swReg._batch.push({ title, body, tag: uniqueTag });
+          // we'll post the batch after the inner loop
+        } else if (notifSupported && Notification.permission === 'granted') {
+          try {
+            promises.push(Promise.resolve(new Notification(title, { body, silent: true, tag: uniqueTag, renotify: false })));
+          } catch (e) {
+            console.error('Notification failed', e);
+            promises.push(Promise.resolve());
+          }
+        } else {
+          promises.push(Promise.resolve());
+        }
+      }
+
+      // if we collected a batch for the service worker, post it once
+      if (swReg && swReg.active && swReg._batch && swReg._batch.length > 0) {
+        try {
+          promises.push(Promise.resolve(swReg.active.postMessage({ type: 'SHOW_NOTIFICATION_BATCH', notifications: swReg._batch })));
+        } catch (e) {
+          console.error('postMessage batch failed', e);
+          promises.push(Promise.resolve());
+        }
+        // clear temporary batch storage
+        swReg._batch = [];
+      }
+
+      // send this sub-batch in parallel (including any SW batch post)
+      await Promise.all(promises);
+
+      // throttle between sub-batches if requested
+      if (subDelay > 0 && offset + subBatch < chunk) {
+        await sleep(subDelay);
+      }
     }
   }
 
