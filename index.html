@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NotifBlast">
+<meta name="theme-color" content="#0A0A0F">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Notif Blaster</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0A0A0F;--card:#141420;--card-b:#1E1E30;--accent:#FF3B5C;--accent-dim:rgba(255,59,92,.15);--green:#00E676;--green-dim:rgba(0,230,118,.15);--txt:#FFF;--txt2:#8888AA;--txt3:#555570;--inp:#1A1A2E;--inp-b:#2A2A40}
+html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Inter',system-ui,sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.app{max-width:480px;margin:0 auto;padding:20px 20px 40px;min-height:100%}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:28px;padding-top:12px}
+.header-icon{width:40px;height:40px;border-radius:12px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center}
+.header-icon svg{width:22px;height:22px;fill:var(--accent)}
+h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
+.install-banner{display:none;align-items:flex-start;gap:12px;background:rgba(0,150,255,.1);border:1px solid rgba(0,150,255,.25);border-radius:14px;padding:16px;margin-bottom:20px;position:relative}
+.install-banner.show{display:flex}
+.install-icon{flex-shrink:0;width:36px;height:36px;border-radius:10px;background:rgba(0,150,255,.15);display:flex;align-items:center;justify-content:center}
+.install-icon svg{width:20px;height:20px;fill:#0096FF}
+.install-content{flex:1}
+.install-title{font-size:14px;font-weight:600;color:#0096FF;margin-bottom:4px}
+.install-desc{font-size:13px;color:var(--txt2);line-height:1.5}
+.install-steps{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.install-step{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--txt);line-height:1.4}
+.step-num{flex-shrink:0;width:24px;height:24px;border-radius:12px;background:rgba(0,150,255,.2);color:#0096FF;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.install-close{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:14px;background:rgba(255,255,255,.05);border:none;color:var(--txt3);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.perm-banner{display:none;align-items:center;gap:10px;background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.25);border-radius:12px;padding:14px 16px;margin-bottom:20px;cursor:pointer}
+.perm-banner.show{display:flex}
+.perm-banner svg{width:18px;height:18px;fill:#FFB800;flex-shrink:0}
+.perm-banner span{flex:1;font-size:14px;font-weight:500;color:#FFB800}
+.section{margin-bottom:20px}
+.label{font-size:12px;font-weight:600;color:var(--txt2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+input,textarea{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:14px 16px;font-family:inherit;font-size:16px;color:var(--txt);outline:none;transition:border-color .2s;resize:none}
+input:focus,textarea:focus{border-color:var(--accent)}
+input:disabled,textarea:disabled{opacity:.5}
+textarea{min-height:72px}
+.interval-row{display:flex;gap:12px}
+.interval-row input{flex:1}
+.rate-box{background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:8px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:80px}
+.rate-val{font-size:18px;font-weight:700;color:var(--accent)}
+.rate-lbl{font-size:11px;color:var(--txt3);margin-top:2px}
+.presets{display:flex;gap:8px;margin-top:10px}
+.preset{flex:1;padding:10px 0;border-radius:10px;background:var(--card);border:1px solid var(--card-b);font-family:inherit;font-size:14px;font-weight:500;color:var(--txt3);cursor:pointer;text-align:center;transition:all .15s}
+.preset.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.preset:disabled{opacity:.5;cursor:default}
+.stats{display:flex;gap:12px;margin-bottom:30px}
+.stat{flex:1;background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:18px 0;text-align:center}
+.stat-val{font-size:28px;font-weight:700}
+.stat-lbl{font-size:12px;color:var(--txt3);margin-top:4px}
+.control{display:flex;flex-direction:column;align-items:center;justify-content:center;height:180px;margin-bottom:20px;position:relative}
+.pulse-ring{position:absolute;width:110px;height:110px;border-radius:55px;border:2px solid var(--accent);opacity:.3;transition:border-color .3s}
+.glow-bg{position:absolute;width:160px;height:160px;border-radius:80px;opacity:0;transition:opacity .3s,background .3s}
+.toggle-btn{width:90px;height:90px;border-radius:45px;border:2px solid var(--accent);background:var(--accent-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;position:relative;z-index:1}
+.toggle-btn:active{transform:scale(.93)}
+.toggle-btn svg{width:36px;height:36px;fill:var(--accent);transition:fill .2s}
+.running .pulse-ring{border-color:var(--green);animation:pulse 1.2s ease-in-out infinite}
+.running .glow-bg{opacity:1;background:rgba(0,230,118,.08)}
+.running .toggle-btn{border-color:var(--green);background:var(--green-dim)}
+.running .toggle-btn svg{fill:var(--green)}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.2}50%{transform:scale(1.15);opacity:.6}}
+.reset-btn{display:none;align-items:center;gap:6px;margin-top:16px;padding:8px 16px;background:none;border:none;cursor:pointer;font-family:inherit;font-size:14px;font-weight:500;color:var(--txt2)}
+.reset-btn.show{display:flex}
+.reset-btn svg{width:20px;height:20px;stroke:var(--txt2);fill:none;stroke-width:2}
+.live{display:none;align-items:center;justify-content:center;gap:8px;background:var(--green-dim);border-radius:10px;padding:10px 16px}
+.live.show{display:flex}
+.live-dot{width:8px;height:8px;border-radius:4px;background:var(--green);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.live-txt{font-size:13px;font-weight:500;color:var(--green)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="header">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+    </div>
+    <h1>Notif Blaster</h1>
+  </div>
+
+  <div class="install-banner" id="installBanner">
+    <div class="install-icon">
+      <svg viewBox="0 0 24 24"><path d="M16 5l-1.42 1.42-1.59-1.59V16h-1.98V4.83L9.42 6.42 8 5l4-4 4 4zm4 5v11c0 1.1-.9 2-2 2H6c-1.11 0-2-.9-2-2V10c0-1.11.89-2 2-2h3v2H6v11h12V10h-3V8h3c1.1 0 2 .89 2 2z"/></svg>
+    </div>
+    <div class="install-content">
+      <div class="install-title">Install to Home Screen</div>
+      <div class="install-desc">To receive push notifications on iOS, you must add this app to your home screen first.</div>
+      <div class="install-steps">
+        <div class="install-step"><span class="step-num">1</span> Tap the <strong>Share</strong> button <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#0096FF;vertical-align:middle"><path d="M16 5l-1.42 1.42-1.59-1.59V16h-1.98V4.83L9.42 6.42 8 5l4-4 4 4zm4 5v11c0 1.1-.9 2-2 2H6c-1.11 0-2-.9-2-2V10c0-1.11.89-2 2-2h3v2H6v11h12V10h-3V8h3c1.1 0 2 .89 2 2z"/></svg> at the bottom of Safari</div>
+        <div class="install-step"><span class="step-num">2</span> Scroll down and tap <strong>"Add to Home Screen"</strong></div>
+        <div class="install-step"><span class="step-num">3</span> Tap <strong>"Add"</strong> in the top-right corner</div>
+        <div class="install-step"><span class="step-num">4</span> Open the app from your home screen</div>
+      </div>
+    </div>
+    <button class="install-close" id="installClose">&times;</button>
+  </div>
+
+  <div class="perm-banner" id="permBanner">
+    <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+    <span>Tap to enable notification permission</span>
+    <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:var(--txt2);flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+  </div>
+
+  <div class="section">
+    <div class="label">Title</div>
+    <input type="text" id="notifTitle" value="Notification" placeholder="Notification title">
+  </div>
+
+  <div class="section">
+    <div class="label">Body</div>
+    <textarea id="notifBody" rows="2" placeholder="Notification body text">This is your notification</textarea>
+  </div>
+
+  <div class="section">
+    <div class="label">Interval (milliseconds)</div>
+    <div class="interval-row">
+      <input type="number" id="intervalMs" value="1000" min="50" placeholder="1000">
+      <div class="rate-box">
+        <div class="rate-val" id="rateVal">1.00</div>
+        <div class="rate-lbl">per sec</div>
+      </div>
+    </div>
+    <div class="presets" id="presets">
+      <button class="preset" data-ms="500">0.5s</button>
+      <button class="preset active" data-ms="1000">1s</button>
+      <button class="preset" data-ms="2000">2s</button>
+      <button class="preset" data-ms="5000">5s</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-val" id="countVal">0</div>
+      <div class="stat-lbl">Sent</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="elapsedVal">00:00:00</div>
+      <div class="stat-lbl">Elapsed</div>
+    </div>
+  </div>
+
+  <div class="control" id="controlArea">
+    <div class="pulse-ring"></div>
+    <div class="glow-bg"></div>
+    <div class="toggle-btn" id="toggleBtn">
+      <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      <svg id="stopIcon" viewBox="0 0 24 24" style="display:none"><path d="M6 6h12v12H6z"/></svg>
+    </div>
+    <button class="reset-btn" id="resetBtn">
+      <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      Reset
+    </button>
+  </div>
+
+  <div class="live" id="liveBar">
+    <div class="live-dot"></div>
+    <div class="live-txt" id="liveTxt">Firing every 1000ms (1.00/sec)</div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  let swReg = null;
+  let isRunning = false;
+  let count = 0;
+  let fireInterval = null;
+  let timerInterval = null;
+  let startTime = null;
+  let permGranted = false;
+
+  const $ = (s) => document.querySelector(s);
+  const titleEl = $('#notifTitle');
+  const bodyEl = $('#notifBody');
+  const msEl = $('#intervalMs');
+  const rateEl = $('#rateVal');
+  const countEl = $('#countVal');
+  const elapsedEl = $('#elapsedVal');
+  const toggleBtn = $('#toggleBtn');
+  const playIcon = $('#playIcon');
+  const stopIcon = $('#stopIcon');
+  const controlArea = $('#controlArea');
+  const resetBtn = $('#resetBtn');
+  const liveBar = $('#liveBar');
+  const liveTxt = $('#liveTxt');
+  const permBanner = $('#permBanner');
+  const installBanner = $('#installBanner');
+  const installClose = $('#installClose');
+  const presetsEl = $('#presets');
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const notifSupported = 'Notification' in window;
+  const swSupported = 'serviceWorker' in navigator;
+
+  function updateRate() {
+    const ms = parseInt(msEl.value) || 1000;
+    const rate = ms > 0 ? (1000 / ms).toFixed(2) : '0';
+    rateEl.textContent = rate;
+  }
+
+  msEl.addEventListener('input', () => {
+    updateRate();
+    presetsEl.querySelectorAll('.preset').forEach(b => {
+      b.classList.toggle('active', b.dataset.ms === msEl.value);
+    });
+  });
+
+  presetsEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.preset');
+    if (!btn || isRunning) return;
+    msEl.value = btn.dataset.ms;
+    updateRate();
+    presetsEl.querySelectorAll('.preset').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+
+  function setInputsDisabled(d) {
+    titleEl.disabled = d;
+    bodyEl.disabled = d;
+    msEl.disabled = d;
+    presetsEl.querySelectorAll('.preset').forEach(b => b.disabled = d);
+  }
+
+  function formatElapsed(ms) {
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+  }
+
+  async function sendNotif() {
+    count++;
+    countEl.textContent = count.toLocaleString();
+    const title = titleEl.value || 'Notification';
+    const body = bodyEl.value || '';
+
+    if (swReg && swReg.active) {
+      swReg.active.postMessage({ type: 'SHOW_NOTIFICATION', title, body, tag: 'blast-' + (count % 3) });
+    } else if (notifSupported && Notification.permission === 'granted') {
+      try { new Notification(title, { body, silent: true, tag: 'blast-' + (count % 3), renotify: true }); } catch(e) {}
+    }
+  }
+
+  function startBlasting() {
+    const ms = Math.max(parseInt(msEl.value) || 1000, 50);
+    count = 0;
+    countEl.textContent = '0';
+    startTime = Date.now();
+    isRunning = true;
+
+    controlArea.classList.add('running');
+    playIcon.style.display = 'none';
+    stopIcon.style.display = 'block';
+    setInputsDisabled(true);
+    resetBtn.classList.remove('show');
+    liveBar.classList.add('show');
+    liveTxt.textContent = 'Firing every ' + ms + 'ms (' + (1000 / ms).toFixed(2) + '/sec)';
+
+    sendNotif();
+    fireInterval = setInterval(sendNotif, ms);
+    timerInterval = setInterval(() => {
+      elapsedEl.textContent = formatElapsed(Date.now() - startTime);
+    }, 250);
+  }
+
+  function stopBlasting() {
+    isRunning = false;
+    clearInterval(fireInterval);
+    clearInterval(timerInterval);
+    fireInterval = null;
+    timerInterval = null;
+
+    controlArea.classList.remove('running');
+    playIcon.style.display = 'block';
+    stopIcon.style.display = 'none';
+    setInputsDisabled(false);
+    liveBar.classList.remove('show');
+    if (count > 0) resetBtn.classList.add('show');
+  }
+
+  async function requestPerm() {
+    if (!notifSupported) return false;
+    const result = await Notification.requestPermission();
+    permGranted = result === 'granted';
+    permBanner.classList.toggle('show', !permGranted);
+    return permGranted;
+  }
+
+  toggleBtn.addEventListener('click', async () => {
+    if (isRunning) {
+      stopBlasting();
+    } else {
+      if (!permGranted) {
+        const ok = await requestPerm();
+        if (!ok) return;
+      }
+      startBlasting();
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    if (isRunning) return;
+    count = 0;
+    countEl.textContent = '0';
+    elapsedEl.textContent = '00:00:00';
+    startTime = null;
+    resetBtn.classList.remove('show');
+  });
+
+  permBanner.addEventListener('click', requestPerm);
+
+  installClose.addEventListener('click', (e) => {
+    e.stopPropagation();
+    installBanner.classList.remove('show');
+    try { sessionStorage.setItem('installDismissed', '1'); } catch(e) {}
+  });
+
+  async function init() {
+    if (isIOS && !isInStandaloneMode && !sessionStorage.getItem('installDismissed')) {
+      installBanner.classList.add('show');
+    }
+
+    if (swSupported) {
+      try {
+        swReg = await navigator.serviceWorker.register('sw.js');
+        await navigator.serviceWorker.ready;
+      } catch(e) {
+        console.warn('SW registration failed:', e);
+      }
+    }
+
+    if (notifSupported) {
+      permGranted = Notification.permission === 'granted';
+      if (!permGranted) {
+        permBanner.classList.add('show');
+      }
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
