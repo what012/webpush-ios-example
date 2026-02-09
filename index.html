@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="NotifBlast">
 <meta name="theme-color" content="#0A0A0F">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="icon" type="image/png" href="/icon-192.png">
 <title>Notif Blaster</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -39,10 +39,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
 .perm-banner span{flex:1;font-size:14px;font-weight:500;color:#FFB800}
 .section{margin-bottom:20px}
 .label{font-size:12px;font-weight:600;color:var(--txt2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
-input,textarea{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:14px 16px;font-family:inherit;font-size:16px;color:var(--txt);outline:none;transition:border-color .2s;resize:none}
-input:focus,textarea:focus{border-color:var(--accent)}
-input:disabled,textarea:disabled{opacity:.5}
-textarea{min-height:72px}
+input{width:100%;background:var(--inp);border:1px solid var(--inp-b);border-radius:12px;padding:14px 16px;font-family:inherit;font-size:16px;color:var(--txt);outline:none;transition:border-color .2s;resize:none}
+input:focus{border-color:var(--accent)}
+input:disabled{opacity:.5}
 .interval-row{display:flex;gap:12px}
 .interval-row input{flex:1}
 .rate-box{background:var(--card);border:1px solid var(--card-b);border-radius:12px;padding:8px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:80px}
@@ -111,16 +110,6 @@ textarea{min-height:72px}
   </div>
 
   <div class="section">
-    <div class="label">Title</div>
-    <input type="text" id="notifTitle" value="Notification" placeholder="Notification title">
-  </div>
-
-  <div class="section">
-    <div class="label">Body</div>
-    <textarea id="notifBody" rows="2" placeholder="Notification body text">This is your notification</textarea>
-  </div>
-
-  <div class="section">
     <div class="label">Interval (milliseconds)</div>
     <div class="interval-row">
       <input type="number" id="intervalMs" value="1000" min="50" placeholder="1000">
@@ -135,27 +124,6 @@ textarea{min-height:72px}
       <button class="preset" data-ms="2000">2s</button>
       <button class="preset" data-ms="5000">5s</button>
     </div>
-  </div>
-
-  <div class="section">
-    <div class="label">Chunk Size</div>
-    <input type="number" id="chunkSize" value="2" min="1" max="200" placeholder="2">
-    <div style="margin-top:8px;font-size:13px;color:var(--txt2)">
-      <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
-        <input type="checkbox" id="chunkMode" checked>
-        <span>Enable chunked mode (multiple notifications per trigger)</span>
-      </label>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="label">Sub-batch Size</div>
-    <input type="number" id="subBatchSize" value="2" min="1" max="200" placeholder="2">
-  </div>
-
-  <div class="section">
-    <div class="label">Delay between sub-batches (ms)</div>
-    <input type="number" id="subBatchDelayMs" value="0" min="0" placeholder="0">
   </div>
 
   <div class="stats">
@@ -200,12 +168,7 @@ textarea{min-height:72px}
   let permGranted = false;
 
   const $ = (s) => document.querySelector(s);
-  const titleEl = $('#notifTitle');
-  const bodyEl = $('#notifBody');
   const msEl = $('#intervalMs');
-  const chunkEl = $('#chunkSize');
-  const subBatchEl = $('#subBatchSize');
-  const subDelayEl = $('#subBatchDelayMs');
   const rateEl = $('#rateVal');
   const countEl = $('#countVal');
   const elapsedEl = $('#elapsedVal');
@@ -220,7 +183,25 @@ textarea{min-height:72px}
   const installBanner = $('#installBanner');
   const installClose = $('#installClose');
   const presetsEl = $('#presets');
-  const chunkModeEl = $('#chunkMode');
+
+  const imgCanvas = document.createElement('canvas');
+  imgCanvas.width = 1440;
+  imgCanvas.height = 1440;
+  const imgCtx = imgCanvas.getContext('2d');
+
+  function generateRGBImage() {
+    const t = count / 50;
+    const r = Math.floor((Math.sin(t) * 0.5 + 0.5) * 255);
+    const g = Math.floor((Math.sin(t + 2.094) * 0.5 + 0.5) * 255);
+    const b = Math.floor((Math.sin(t + 4.189) * 0.5 + 0.5) * 255);
+    const grad = imgCtx.createLinearGradient(0, 0, 1440, 1440);
+    grad.addColorStop(0, 'rgb(' + r + ',' + g + ',' + b + ')');
+    grad.addColorStop(0.5, 'rgb(' + (255 - r) + ',' + (255 - g) + ',' + (255 - b) + ')');
+    grad.addColorStop(1, 'rgb(' + g + ',' + b + ',' + r + ')');
+    imgCtx.fillStyle = grad;
+    imgCtx.fillRect(0, 0, 1440, 1440);
+    return imgCanvas.toDataURL('image/png');
+  }
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -250,17 +231,9 @@ textarea{min-height:72px}
   });
 
   function setInputsDisabled(d) {
-    titleEl.disabled = d;
-    bodyEl.disabled = d;
     msEl.disabled = d;
     presetsEl.querySelectorAll('.preset').forEach(b => b.disabled = d);
-    if (chunkEl) chunkEl.disabled = d;
-    if (subBatchEl) subBatchEl.disabled = d;
-    if (subDelayEl) subDelayEl.disabled = d;
-    if (chunkModeEl) chunkModeEl.disabled = d;
   }
-
-  function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
   function formatElapsed(ms) {
     const s = Math.floor(ms / 1000);
@@ -271,58 +244,17 @@ textarea{min-height:72px}
   }
 
   async function sendNotif() {
-    const title = titleEl.value || 'Notification';
-    const body = bodyEl.value || '';
-    const useChunk = chunkModeEl ? chunkModeEl.checked : true;
-    const chunk = useChunk ? Math.max(1, Math.min(200, parseInt((chunkEl && chunkEl.value) || 1))) : 1;
-    const subBatch = useChunk ? Math.max(1, Math.min(chunk, parseInt((subBatchEl && subBatchEl.value) || chunk))) : 1;
-    const subDelay = Math.max(0, parseInt((subDelayEl && subDelayEl.value) || 0));
+    count++;
+    countEl.textContent = count.toLocaleString();
+    const title = '' + count;
+    const elapsed = startTime ? formatElapsed(Date.now() - startTime) : '00:00:00';
+    const body = '#' + count + ' | Running ' + elapsed;
+    const image = generateRGBImage();
 
-    for (let offset = 0; offset < chunk; offset += subBatch) {
-      const promises = [];
-      const take = Math.min(subBatch, chunk - offset);
-      for (let i = 0; i < take; i++) {
-        const idx = offset + i;
-        count++;
-        countEl.textContent = count.toLocaleString();
-        const uniqueTag = 'blast-' + Date.now() + '-' + count + '-' + idx;
-
-        if (swReg && swReg.active) {
-          // collect into batch for this sub-batch
-          if (!swReg._batch) swReg._batch = [];
-          swReg._batch.push({ title, body, tag: uniqueTag });
-          // we'll post the batch after the inner loop
-        } else if (notifSupported && Notification.permission === 'granted') {
-          try {
-            promises.push(Promise.resolve(new Notification(title, { body, silent: true, tag: uniqueTag, renotify: false })));
-          } catch (e) {
-            console.error('Notification failed', e);
-            promises.push(Promise.resolve());
-          }
-        } else {
-          promises.push(Promise.resolve());
-        }
-      }
-
-      // if we collected a batch for the service worker, post it once
-      if (swReg && swReg.active && swReg._batch && swReg._batch.length > 0) {
-        try {
-          promises.push(Promise.resolve(swReg.active.postMessage({ type: 'SHOW_NOTIFICATION_BATCH', notifications: swReg._batch })));
-        } catch (e) {
-          console.error('postMessage batch failed', e);
-          promises.push(Promise.resolve());
-        }
-        // clear temporary batch storage
-        swReg._batch = [];
-      }
-
-      // send this sub-batch in parallel (including any SW batch post)
-      await Promise.all(promises);
-
-      // throttle between sub-batches if requested
-      if (subDelay > 0 && offset + subBatch < chunk) {
-        await sleep(subDelay);
-      }
+    if (swReg && swReg.active) {
+      swReg.active.postMessage({ type: 'SHOW_NOTIFICATION', title, body, tag: 'blast-' + (count % 3), image });
+    } else if (notifSupported && Notification.permission === 'granted') {
+      try { new Notification(title, { body, silent: true, tag: 'blast-' + (count % 3), renotify: true, image }); } catch(e) {}
     }
   }
 
@@ -407,7 +339,7 @@ textarea{min-height:72px}
 
     if (swSupported) {
       try {
-        swReg = await navigator.serviceWorker.register('sw.js');
+        swReg = await navigator.serviceWorker.register('/sw.js');
         await navigator.serviceWorker.ready;
       } catch(e) {
         console.warn('SW registration failed:', e);
