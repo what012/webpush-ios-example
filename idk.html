@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>GitHub Tree Filler (Multi Token)</title>
+<style>
+body{font-family:sans-serif;padding:20px}
+textarea,input,button{margin:5px}
+#progress{width:100%;height:20px;background:#ddd}
+#bar{height:100%;width:0%;background:#4caf50}
+pre{background:#f4f4f4;padding:10px;max-height:300px;overflow:auto}
+</style>
+</head>
+<body>
+
+<h2>GitHub Tree Filler (Multi-Token)</h2>
+
+<textarea id="tokens" rows="5" cols="60"
+placeholder="Paste GitHub tokens here (one per line)"></textarea><br>
+
+Repo: <input id="repo" value="funny-dir-tree"><br>
+Depth (x): <input id="depth" type="number" value="3" style="width:60px">
+Width (y): <input id="width" type="number" value="3" style="width:60px">
+<button id="run">Run</button>
+
+<div id="progress"><div id="bar"></div></div>
+<pre id="log"></pre>
+
+<script>
+const OWNER="what012";
+const logEl=document.getElementById("log");
+const bar=document.getElementById("bar");
+
+function log(m){logEl.textContent+=m+"\n";logEl.scrollTop=logEl.scrollHeight;}
+
+let TOKENS=[],tokenIndex=0;
+
+function nextToken(){
+  tokenIndex=(tokenIndex+1)%TOKENS.length;
+  log("Switched token → "+(tokenIndex+1));
+}
+
+async function gh(url,opt={}){
+  let r=await fetch(url,{
+    ...opt,
+    headers:{
+      "Authorization":"Bearer "+TOKENS[tokenIndex],
+      "Accept":"application/vnd.github+json",
+      ...(opt.headers||{})
+    }
+  });
+  if(r.status===403){
+    nextToken();
+    r=await fetch(url,{
+      ...opt,
+      headers:{
+        "Authorization":"Bearer "+TOKENS[tokenIndex],
+        "Accept":"application/vnd.github+json",
+        ...(opt.headers||{})
+      }
+    });
+  }
+  return r;
+}
+
+async function checkTokens(){
+  for(let i=0;i<TOKENS.length;i++){
+    tokenIndex=i;
+    const r=await gh("https://api.github.com/user");
+    if(r.ok){
+      const j=await r.json();
+      log("Valid token "+(i+1)+": "+j.login);
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildTree(paths){
+  const root={};
+  for(const p of paths){
+    let n=root;
+    for(const part of p.split("/")){
+      n=n[part]||(n[part]={});
+    }
+  }
+  return root;
+}
+
+function isComplete(node,d,w){
+  if(d===0)return true;
+  for(let i=1;i<=w;i++){
+    if(!node[i]||!isComplete(node[i],d-1,w))return false;
+  }
+  return true;
+}
+
+async function* genFull(p,d,w){
+  if(d===0){yield p+"/.gitkeep";return;}
+  for(let i=1;i<=w;i++)yield* genFull(`${p}/${i}`,d-1,w);
+}
+
+async function* fill(node,p,d,w){
+  if(d===0){yield p+"/.gitkeep";return;}
+  for(let i=1;i<=w;i++){
+    const np=p?`${p}/${i}`:`${i}`;
+    if(!node[i]){
+      yield* genFull(np,d-1,w);
+      node[i]={};
+    }else if(!isComplete(node[i],d-1,w)){
+      yield* fill(node[i],np,d-1,w);
+    }
+  }
+}
+
+document.getElementById("run").onclick=async()=>{
+  TOKENS=document.getElementById("tokens").value.split("\n").map(t=>t.trim()).filter(Boolean);
+  if(!TOKENS.length)return alert("Add at least one token");
+
+  const repo=document.getElementById("repo").value.trim();
+  const x=+depth.value,y=+width.value;
+  if(x<1||y<1)return alert("Bad depth/width");
+
+  if(!(await checkTokens()))return alert("No valid tokens");
+
+  let r=await gh(`https://api.github.com/repos/${OWNER}/${repo}`);
+  if(r.status===404){
+    log("Creating repo");
+    await gh("https://api.github.com/user/repos",{method:"POST",body:JSON.stringify({name:repo,private:true})});
+  }
+
+  let head;
+  try{
+    head=(await (await gh(`https://api.github.com/repos/${OWNER}/${repo}/git/ref/heads/main`)).json()).object.sha;
+  }catch{
+    const b=await gh(`https://api.github.com/repos/${OWNER}/${repo}/git/blobs`,
+      {method:"POST",body:JSON.stringify({content:"",encoding:"utf-8"})});
+    const bs=(await b.json()).sha;
+    const t=await gh(`https://api.github.com/repos/${OWNER}/${repo}/git/trees`,
+      {method:"POST",body:JSON.stringify({tree:[{path:".gitkeep",mode:"100644",type:"blob",sha:bs}]})});
+    const ts=(await t.json()).sha;
+    const c=await gh(`https://api.github.com/repos/${OWNER}/${repo}/git/commits`,
+      {method:"POST",body:JSON.stringify({message:"init",tree:ts})});
+    head=(await c.json()).sha;
+    await gh(`https://api.github.com/repos/${OWNER}/${repo}/git/refs`,
+      {method:"POST",body:JSON.stringify({ref:"refs/heads/main",sha:head})});
+  }
+
+  const tr=await gh(`https://api.github.com/repos/${OWNER}/${repo}/git/trees/main?recursive=1`);
+  const tree=buildTree((await tr.json()).tree.filter(e=>e.type==="tree").map(e=>e.path));
+
+  let batch=[],count=0;
+  const BATCH=2000,total=Math.pow(y,x);
+
+  for await(const p of fill(tree,"",x,y)){
+    batch.push({path:p,mode:"100644",type:"blob",content:""});
+    count++;
+    if(batch.length>=BATCH)await commit();
+    bar.style.width=Math.min(100,Math.floor(count/total*100))+"%";
+  }
+  if(batch.length)await commit();
+
+  async function commit(){
+    const t=await gh(`https://api.github.com/repos/${OWNER}/${repo}/git/trees`,
+      {method:"POST",body:JSON.stringify({base_tree:head,tree:batch})});
+    const ts=(await t.json()).sha;
+    const c=await gh(`https://api.github.com/repos/${OWNER}/${repo}/git/commits`,
+      {method:"POST",body:JSON.stringify({message:"fill",tree:ts,parents:[head]})});
+    head=(await c.json()).sha;
+    await gh(`https://api.github.com/repos/${OWNER}/${repo}/git/refs/heads/main`,
+      {method:"PATCH",body:JSON.stringify({sha:head})});
+    log("Committed "+batch.length);
+    batch=[];
+  }
+
+  bar.style.width="100%";
+  log("DONE");
+};
+</script>
+</body>
+</html>
